@@ -7,7 +7,7 @@ Example:
 
     or
 
-    >>> McServer('my.mcserver.com').Update().player_names_sample
+    >>> McServer('my.mcserver.com').update().player_names_sample
     frozenset(['mf', 'dignity', 'viking'])
 
 Based on:
@@ -31,19 +31,19 @@ class McServer:
   def __init__(self, host, port=DEFAULT_PORT):
     self._host = host
     self._port = int(port)
-    self._Reinit()
+    self._reinit()
 
-  def _Reinit(self):
+  def _reinit(self):
     self._available = False
     self._num_players_online = 0
     self._max_players_online = 0
     self._player_names_sample = frozenset()
 
-  def Update(self):
+  def update(self):
     # print "Updating "+  self._host + "/" + str(self._port)
-    self._Reinit()
+    self._reinit()
     try:
-      json_dict = GetJson(self._host, port=self._port)
+      json_dict = getjson(self._host, port=self._port)
     except (socket.error, ValueError) as e:
       logging.debug(e)
       return self
@@ -69,7 +69,7 @@ class McServer:
     return self._player_names_sample
 
 
-def GetJson(host, port=DEFAULT_PORT):
+def getjson(host, port=DEFAULT_PORT):
   """
   Example response:
 
@@ -92,14 +92,14 @@ def GetJson(host, port=DEFAULT_PORT):
   s.connect((host, port))
 
   # Send the handshake + status request.
-  s.send(_PackData('\x00\x00' + _PackData(host.encode('utf8'))
-                   + _PackPort(port) + '\x01'))
-  s.send(_PackData('\x00'))
+  s.send(_packdata('\x00\x00' + _packdata(host.encode('utf8'))
+                   + _packport(port) + '\x01'))
+  s.send(_packdata('\x00'))
 
   # Read the response.
-  unused_packet_len = _UnpackVarint(s)
-  unused_packet_id = _UnpackVarint(s)
-  expected_response_len = _UnpackVarint(s)
+  unused_packet_len = _unpackvarint(s)
+  unused_packet_id = _unpackvarint(s)
+  expected_response_len = _unpackvarint(s)
 
   data = ''
   while len(data) < expected_response_len:
@@ -110,7 +110,7 @@ def GetJson(host, port=DEFAULT_PORT):
   return json.loads(data.decode('utf8'))
 
 
-def _UnpackVarint(s):
+def _unpackvarint(s):
   num = 0
   for i in range(5):
     next_byte = ord(s.recv(1))
@@ -120,7 +120,7 @@ def _UnpackVarint(s):
   return num
 
 
-def _PackVarint(num):
+def _packvarint(num):
   remainder = num
   packed = ''
   while True:
@@ -132,11 +132,11 @@ def _PackVarint(num):
   return packed
 
 
-def _PackData(data_str):
-  return _PackVarint(len(data_str)) + data_str
+def _packdata(data_str):
+  return _packvarint(len(data_str)) + data_str
 
 
-def _PackPort(port_num):
+def _packport(port_num):
   return struct.pack('>H', port_num)
 
 
@@ -159,7 +159,7 @@ if __name__ == '__main__':
   logging.info('querying %s:%d', args.host, args.port)
 
   server = McServer(args.host, port=args.port)
-  server.Update()
+  server.update()
   if server.available:
     logging.info(
         'available, %d/%d online: %s',

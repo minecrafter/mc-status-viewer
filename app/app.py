@@ -1,5 +1,5 @@
 from collections import OrderedDict
-import mcstatus, yaml, time, threading
+import mcstatus, yaml, threading, sys
 from bottle import route, run, template, static_file, error
 
 data = {}
@@ -7,8 +7,6 @@ json_response = None
 
 with open('config.yml', 'r') as cfg_file:
     servers_config = yaml.load(cfg_file)
-
-# c = 0.0
 
 for category in servers_config:
     print category
@@ -19,52 +17,43 @@ for category in servers_config:
         if "/" not in ip:
             ip += "/25565"
         status = mcstatus.McServer(ip.split("/")[0], ip.split("/")[1])
-        # c += 1
         data[category][server] = status
 
 def update_all():
-#    i = 0.0
     for category in data:
-#        d = 5.0 / c
         for server in data[category]:
-#            i += 1.0
             status = data[category][server]
-            threading.Thread(target=lambda: status.Update()).start()
+            threading.Thread(target=lambda: status.update()).start()
             
 def sort_dict_by_key(to_sort):
     return OrderedDict(sorted(to_sort.items(), key=lambda t: t[0]))
 
 def generate_json():
-    alive = "alive"
-    dead = "dead"
-    response = {}
-    response[alive] = {}
-    response[dead] = {}
+    response = {"alive": {}, "dead": {}}
+
     for category in data:
-        response[alive][category] = {}
-        response[dead][category] = []
+        alive = {}
+        dead = []
         for server in data[category]:
             status = data[category][server]
             if status.available:
-                response[alive][category][server] = str(status.num_players_online) + "/" + str(status.max_players_online)
+                alive[server] = str(status.num_players_online) + "/" + str(status.max_players_online)
             else:
-                response[dead][category].append(server)
-        response[alive][category] = sort_dict_by_key(response[alive][category])
-        response[dead][category].sort()
-        if len(response[alive][category]) == 0:
-            del response[alive][category]
-        if len(response[dead][category]) == 0:
-            del response[dead][category]
-    response[alive] = sort_dict_by_key(response[alive])
-    response[dead] = sort_dict_by_key(response[dead])
+                dead.append(server)
+
+        if len(alive) > 0:
+            response["alive"][category] = sort_dict_by_key(alive)
+        if len(dead) > 0:
+            dead.sort()
+            response["dead"][category] = dead
+
+    response["alive"] = sort_dict_by_key(response["alive"])
+    response["dead"] = sort_dict_by_key(response["dead"])
     return response
 
 def schedule_update():
     threading.Timer(5, schedule_update).start()
     update_all()
-
-def schedule_json():
-    threading.Timer(1.5, schedule_json).start()
     global json_response
     json_response = generate_json()
 
@@ -85,7 +74,6 @@ def server_static(filename):
     return static_file(filename, root = '..')
 
 schedule_update()
-schedule_json()
 
 try:
     run(host='localhost', port=8080)
